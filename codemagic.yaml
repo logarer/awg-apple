@@ -11,24 +11,14 @@ workflows:
           brew install swiftlint go
       - name: Build IPA without signing
         script: |
-          echo "=== Listing schemes ==="
           xcodebuild -project WireGuard.xcodeproj -list
-          
-          echo "=== Building ==="
           xcodebuild -project WireGuard.xcodeproj \
-            -scheme AmneziaWG \
-            -config Release \
-            -sdk iphoneos \
-            -archivePath $CM_BUILD_DIR/WireGuard.xcarchive \
-            archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" || \
-          xcodebuild -project WireGuard.xcodeproj \
-            -scheme WireGuard \
+            -scheme WireGuardiOS \
             -config Release \
             -sdk iphoneos \
             -archivePath $CM_BUILD_DIR/WireGuard.xcarchive \
             archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 
-          echo "=== Making IPA ==="
           mkdir -p $CM_BUILD_DIR/build/Payload
           cp -R $CM_BUILD_DIR/WireGuard.xcarchive/Products/Applications/*.app $CM_BUILD_DIR/build/Payload/
           cd $CM_BUILD_DIR/build
