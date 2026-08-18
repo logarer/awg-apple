@@ -18,7 +18,6 @@ workflows:
             -sdk iphoneos \
             -archivePath $CM_BUILD_DIR/WireGuard.xcarchive \
             archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
-
           mkdir -p $CM_BUILD_DIR/build/Payload
           cp -R $CM_BUILD_DIR/WireGuard.xcarchive/Products/Applications/*.app $CM_BUILD_DIR/build/Payload/
           cd $CM_BUILD_DIR/build
