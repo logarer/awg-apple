@@ -5,47 +5,33 @@ workflows:
     instance_type: mac_mini_m2
     environment:
       xcode: latest
-      vars:
-        XCODE_WORKSPACE: "WireGuard.xcodeproj"
     scripts:
       - name: Install Go and SwiftLint
         script: |
           brew install swiftlint go
       - name: Build IPA without signing
         script: |
-          # اول یک فایل exportOptions میسازیم
-          cat > /tmp/exportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>development</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-          </dict>
-          </plist>
-          EOF
+          echo "=== Listing schemes ==="
+          xcodebuild -project WireGuard.xcodeproj -list
           
+          echo "=== Building ==="
           xcodebuild -project WireGuard.xcodeproj \
-            -scheme WireGuardApp \
+            -scheme AmneziaWG \
+            -config Release \
+            -sdk iphoneos \
+            -archivePath $CM_BUILD_DIR/WireGuard.xcarchive \
+            archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" || \
+          xcodebuild -project WireGuard.xcodeproj \
+            -scheme WireGuard \
             -config Release \
             -sdk iphoneos \
             -archivePath $CM_BUILD_DIR/WireGuard.xcarchive \
             archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY=""
 
-          # تبدیل به IPA بدون امضا
-          mkdir -p $CM_BUILD_DIR/build/ipa
-          xcodebuild -exportArchive \
-            -archivePath $CM_BUILD_DIR/WireGuard.xcarchive \
-            -exportPath $CM_BUILD_DIR/build/ipa \
-            -exportOptionsPlist /tmp/exportOptions.plist CODE_SIGNING_ALLOWED=NO || true
-          
-          # اگر بالا نشد، به صورت دستی IPA میسازیم
+          echo "=== Making IPA ==="
+          mkdir -p $CM_BUILD_DIR/build/Payload
+          cp -R $CM_BUILD_DIR/WireGuard.xcarchive/Products/Applications/*.app $CM_BUILD_DIR/build/Payload/
           cd $CM_BUILD_DIR/build
-          mkdir -p Payload
-          cp -r ~/Library/Developer/Xcode/DerivedData/*/Build/Products/Release-iphoneos/WireGuard*.app Payload/ 2>/dev/null || cp -r $CM_BUILD_DIR/WireGuard.xcarchive/Products/Applications/*.app Payload/
           zip -r AmneziaWG-unsigned.ipa Payload
     artifacts:
-      - build/ipa/*.ipa
       - build/*.ipa
