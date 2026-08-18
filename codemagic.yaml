@@ -9,9 +9,12 @@ workflows:
       - name: Install Go and SwiftLint
         script: |
           brew install swiftlint go
+      - name: Create missing config
+        script: |
+          touch Sources/WireGuardApp/Config/Developer.xcconfig
+          echo "Created Developer.xcconfig"
       - name: Build IPA without signing
         script: |
-          xcodebuild -project WireGuard.xcodeproj -list
           xcodebuild -project WireGuard.xcodeproj \
             -scheme WireGuardiOS \
             -config Release \
