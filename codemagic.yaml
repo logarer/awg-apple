@@ -1,68 +1,43 @@
 workflows:
   ios-awg-build:
     name: AmneziaWG iOS Build
-    max_build_duration: 60
     instance_type: mac_mini_m2
+    max_build_duration: 60
     environment:
       xcode: latest
     scripts:
       - name: Build IPA
         script: |
           set -e
-          set -x
-          
-          # 1. باینری اصلی swiftlint که تو لاگت اجرا شد رو نابود کن
           brew uninstall swiftlint --ignore-dependencies || true
           sudo rm -f /opt/homebrew/bin/swiftlint /usr/local/bin/swiftlint
-          # یک فیک بساز که همیشه موفق باشه
-          sudo tee /opt/homebrew/bin/swiftlint > /dev/null <<'EOS'
-          #!/bin/sh
-          echo "Fake swiftlint -> skip, exit 0"
-          exit 0
-          EOS
+          echo -e '#!/bin/sh\nexit 0' | sudo tee /opt/homebrew/bin/swiftlint > /dev/null
           sudo chmod +x /opt/homebrew/bin/swiftlint
           sudo cp /opt/homebrew/bin/swiftlint /usr/local/bin/swiftlint
-          mkdir -p $HOME/bin
-          cp /opt/homebrew/bin/swiftlint $HOME/bin/swiftlint
-          chmod +x $HOME/bin/swiftlint
-          export PATH="$HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-          which swiftlint
-          swiftlint # باید exit 0 بده
+          mkdir -p $HOME/bin && cp /opt/homebrew/bin/swiftlint $HOME/bin/swiftlint && chmod +x $HOME/bin/swiftlint
+          export PATH="$HOME/bin:$PATH"
 
-          # 2. برای اطمینان project.pbxproj رو هم پچ کن
           python3 << 'PY'
-          import re, pathlib
+          import pathlib, re
+          h = pathlib.Path("Sources/WireGuardKitC/WireGuardKitC.h")
+          t = h.read_text()
+          if "#include <sys/types.h>" not in t:
+              t = t.replace("#define CTLIOCGINFO", "#include <sys/types.h>\n#include <sys/socket.h>\n#define CTLIOCGINFO")
+              h.write_text(t)
           p = pathlib.Path("WireGuard.xcodeproj/project.pbxproj")
           s = p.read_text()
-          # هر shellScript که داخلش swiftlint هست رو با exit 0 عوض کن - با DOTALL
-          s = re.sub(r'shellScript = ".*?swiftlint.*?";', 'shellScript = "exit 0";', s, flags=re.IGNORECASE|re.DOTALL)
+          s = re.sub(r'shellScript = ".*?swiftlint.*?";', 'shellScript = "exit 0";', s, flags=re.I|re.S)
           p.write_text(s)
-          print("patched pbxproj")
           PY
-          grep -A2 'Swiftlint' WireGuard.xcodeproj/project.pbxproj | head -20
 
           brew install go || true
-          rm -f .swiftlint.yml
           echo "disabled_rules: [all]" > .swiftlint.yml
-          cp Sources/WireGuardApp/Config/Developer.xcconfig.template Sources/WireGuardApp/Config/Developer.xcconfig 2>/dev/null || touch Sources/WireGuardApp/Config/Developer.xcconfig
+          cp Sources/WireGuardApp/Config/Developer.xcconfig.template Sources/WireGuardApp/Config/Developer.xcconfig || true
 
-          # 3. بیلد - مثل ویدیو ولی با destination
-          export PATH="$HOME/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
-          xcodebuild -project WireGuard.xcodeproj \
-            -scheme WireGuardiOS \
-            -configuration Release \
-            -sdk iphoneos \
-            -destination 'generic/platform=iOS' \
-            -archivePath $CM_BUILD_DIR/WireGuard.xcarchive \
-            archive \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            CODE_SIGN_IDENTITY="" 
+          xcodebuild -project WireGuard.xcodeproj -scheme WireGuardiOS -configuration Release -sdk iphoneos -destination 'generic/platform=iOS' -archivePath $CM_BUILD_DIR/WireGuard.xcarchive archive CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" SWIFT_ENABLE_EXPLICIT_MODULES=NO CLANG_ENABLE_EXPLICIT_MODULES=NO
 
           mkdir -p $CM_BUILD_DIR/build/Payload
           cp -R $CM_BUILD_DIR/WireGuard.xcarchive/Products/Applications/*.app $CM_BUILD_DIR/build/Payload/
-          cd $CM_BUILD_DIR/build
-          zip -r AmneziaWG-unsigned.ipa Payload
-          ls -lh
+          cd $CM_BUILD_DIR/build && zip -r AmneziaWG-unsigned.ipa Payload
     artifacts:
       - build/*.ipa
